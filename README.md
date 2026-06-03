@@ -17,7 +17,6 @@ A personal home lab for learning, attacking, and defending **Active Directory** 
 - [AD Structure](#ad-structure)
 - [Attack Techniques](#attack-techniques)
 - [Defense & Detection](#defense--detection)
-- [Scripts](#scripts)
 - [Writeups](#writeups)
 - [Resources](#resources)
 
@@ -72,16 +71,16 @@ This lab simulates a real enterprise Active Directory environment to:
 | Host Machine | (Your PC / Laptop) |
 | RAM | Minimum 16GB recommended |
 | Storage | Minimum 100GB free |
-| Hypervisor | VMware Workstation / VirtualBox / Proxmox |
+| Hypervisor | Oracle VirtualBox |
 
 ### Virtual Machines
 
 | VM | OS | IP | Role |
 |----|----|----|------|
-| DC01 | Windows Server 2022 | 192.168.10.10 | Domain Controller |
-| SRV01 | Windows Server 2022 | 192.168.10.11 | Member Server |
+| DC01 | Windows Server 2019 | 192.168.10.10 | Domain Controller |
+| SRV01 | Windows 10 | 192.168.10.11 | Member Server |
 | WIN10 | Windows 10 Pro | 192.168.10.20 | Victim Workstation |
-| KALI | Kali Linux 2024 | 192.168.10.30 | Attacker Machine |
+| KALI | Kali Linux | 192.168.10.30 | Attacker Machine |
 
 ---
 
@@ -89,51 +88,47 @@ This lab simulates a real enterprise Active Directory environment to:
 
 ### Step 1 — Download ISOs
 
-- [Windows Server 2022 Evaluation](https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2022)
-- [Windows 10 Evaluation](https://www.microsoft.com/en-us/evalcenter/evaluate-windows-10-enterprise)
+- [Windows Server 2019 Evaluation](https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2019)
+- [Windows 10](https://www.microsoft.com/en-us/software-download/windows10)
+- [Windows 10 Pro](https://www.microsoft.com/en-us/software-download/windows10)
 - [Kali Linux](https://www.kali.org/get-kali/)
 
-### Step 2 — Install Domain Controller
+### Step 2 — Set Up VirtualBox Network
 
-```powershell
-# Install AD DS Role
-Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+1. Open **VirtualBox → File → Host Network Manager**
+2. Click **Create** → note the network (e.g. `192.168.10.0/24`)
+3. For each VM → **Settings → Network → Adapter 1 → Host-only Adapter**
+4. This puts all VMs on the same private network
 
-# Promote to Domain Controller
-Install-ADDSForest `
-  -DomainName "brainrotshiva.local" `
-  -DomainNetbiosName "BRAINROTSHIVA" `
-  -ForestMode "WinThreshold" `
-  -DomainMode "WinThreshold" `
-  -InstallDns:$true `
-  -Force:$true
-```
+### Step 3 — Install Domain Controller (GUI)
 
-### Step 3 — Create Users & Groups
+1. Boot **Windows Server 2019** VM
+2. Open **Server Manager → Add Roles and Features**
+3. Click **Next** until you reach **Server Roles**
+4. Check ✅ **Active Directory Domain Services**
+5. Click **Add Features → Next → Install**
+6. After install, click the ⚠️ flag in Server Manager
+7. Click **Promote this server to a domain controller**
+8. Select **Add a new forest**
+9. Set Root domain name: `brainrotshiva.local`
+10. Set a DSRM password → click **Next → Install**
+11. Server will **restart automatically**
 
-```powershell
-# Create OUs
-New-ADOrganizationalUnit -Name "IT" -Path "DC=brainrotshiva,DC=local"
-New-ADOrganizationalUnit -Name "HR" -Path "DC=brainrotshiva,DC=local"
-New-ADOrganizationalUnit -Name "Finance" -Path "DC=brainrotshiva,DC=local"
+### Step 4 — Create Users & Groups (GUI)
 
-# Create Users
-New-ADUser -Name "John Smith" -GivenName "John" -Surname "Smith" `
-  -SamAccountName "jsmith" -UserPrincipalName "jsmith@brainrotshiva.local" `
-  -Path "OU=IT,DC=brainrotshiva,DC=local" `
-  -AccountPassword (ConvertTo-SecureString "Password123!" -AsPlainText -Force) `
-  -Enabled $true
+1. On DC → Open **Server Manager → Tools → Active Directory Users and Computers**
+2. Right-click your domain → **New → Organizational Unit**
+3. Create OUs: `IT`, `HR`, `Finance`
+4. Right-click an OU → **New → User** → fill in name and password
+5. Right-click an OU → **New → Group** → set name and scope
 
-# Create Groups
-New-ADGroup -Name "IT-Admins" -GroupScope Global -Path "OU=IT,DC=brainrotshiva,DC=local"
-```
+### Step 5 — Join Windows 10 to Domain (GUI)
 
-### Step 4 — Join Workstation to Domain
-
-```powershell
-# On Windows 10 machine
-Add-Computer -DomainName "brainrotshiva.local" -Restart
-```
+1. On **Windows 10 VM** → Right-click **This PC → Properties**
+2. Click **Change settings → Change**
+3. Select **Domain** → type `brainrotshiva.local`
+4. Enter Domain Admin credentials when prompted
+5. Click **OK** → Restart the VM
 
 ---
 
@@ -254,24 +249,6 @@ falsepositives:
   - Legacy systems using RC4
 level: high
 ```
-
----
-
-## 📜 Scripts
-
-### `scripts/create-users.ps1`
-Bulk create AD users for lab testing.
-
-### `scripts/ad-enum.sh`
-Automated AD enumeration from Kali Linux.
-
-### `scripts/hardening.ps1`
-Apply security hardening to Domain Controller.
-
-### `scripts/event-monitor.ps1`
-Monitor key Windows Event IDs in real time.
-
-> All scripts are in the `/scripts` folder.
 
 ---
 
